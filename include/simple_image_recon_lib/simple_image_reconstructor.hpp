@@ -110,12 +110,13 @@ public:
         std::cerr << e.x() << " " << e.y() << " is inactive!" << std::endl;
         throw std::runtime_error("inactivating inactive pixel!");
       }
+      s.markInActive();
       // filter state spatially and mark as inactive
       s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
 
       // now update tile
       auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
-      if (s.getPixelCount() == 0) {
+      if (tile.getPixelCount() == 0) {
         std::cerr << e.x() << " " << e.y() << " tile is empty!" << std::endl;
         throw std::runtime_error("empty tile!");
       }
