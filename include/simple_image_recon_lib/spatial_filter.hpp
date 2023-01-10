@@ -28,15 +28,38 @@ namespace spatial_filter
 {
 static inline size_t idx(uint16_t x, uint16_t y, uint16_t w) { return (y * w + x); }
 
-static constexpr size_t k_idx(int x, int y) { return ((y + 1) * 3 + x + 1); }
+template <typename T, int N>
+static T filter(
+  const T * state, uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+  const std::array<std::array<float, N>, N> & K)
+{
+  constexpr int w = N / 2;
+  const uint16_t x_min = std::max(0, static_cast<int>(x) - w);
+  const uint16_t x_max = std::min(static_cast<int>(x) + w + 1, static_cast<int>(width));
+  const uint16_t y_min = std::max(0, static_cast<int>(y) - w);
+  const uint16_t y_max = std::min(static_cast<int>(y) + w + 1, static_cast<int>(height));
+
+  T sum(0, 0, 0, state[idx(x, y, width)].getPixelCount());
+
+  for (uint16_t iy = y_min; iy < y_max; iy++) {
+    const int ky = iy - y + w;
+    for (uint16_t ix = x_min; ix < x_max; ix++) {
+      const int kx = ix - x + w;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+      sum += state[iy * width + ix] * K[ky][kx];
+    }
+  }
+  return (sum);
+}
 
 template <typename T>
 static T filter_3x3(
-  const T * s, uint16_t x, uint16_t y, uint16_t w, uint16_t h, const std::array<float, 3 * 3> & K)
+  const T * s, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+  const std::array<std::array<float, 3>, 3> & K)
 {
   // first initialize the filter sum with the center, from where
   // it also gets its pixel count (but not the activity!)
-  const auto cc = K[k_idx(0, 0)];
+  const auto cc = K[1][1];
   const auto & center = s[idx(x, y, w)];
   T sum(center.getL() * cc, center.getL_lag() * cc, 0, center.getPixelCount());
   if (x > 0) {            // not at the left boundary
@@ -44,64 +67,64 @@ static T filter_3x3(
       if (y > 0) {        // not at the top boundary
         if (y < h - 1) {  // at none of the boundaries
           // update entire region
-          sum += s[idx(x - 1, y - 1, w)] * K[k_idx(-1, -1)];
-          sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-          sum += s[idx(x + 1, y - 1, w)] * K[k_idx(+1, -1)];
-          sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
-          sum += s[idx(x + 1, y, w)] * K[k_idx(+1, 0)];
-          sum += s[idx(x - 1, y + 1, w)] * K[k_idx(-1, +1)];
-          sum += s[idx(x, y + 1, w)] * K[k_idx(0, +1)];
-          sum += s[idx(x + 1, y + 1, w)] * K[k_idx(+1, +1)];
+          sum += s[idx(x - 1, y - 1, w)] * K[0][0];
+          sum += s[idx(x, y - 1, w)] * K[1][0];
+          sum += s[idx(x + 1, y - 1, w)] * K[2][0];
+          sum += s[idx(x - 1, y, w)] * K[0][1];
+          sum += s[idx(x + 1, y, w)] * K[2][1];
+          sum += s[idx(x - 1, y + 1, w)] * K[0][2];
+          sum += s[idx(x, y + 1, w)] * K[1][2];
+          sum += s[idx(x + 1, y + 1, w)] * K[2][2];
         } else {  // at bottom boundary, but not corner
-          sum += s[idx(x - 1, y - 1, w)] * K[k_idx(-1, -1)];
-          sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-          sum += s[idx(x + 1, y - 1, w)] * K[k_idx(1, -1)];
-          sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
-          sum += s[idx(x + 1, y, w)] * K[k_idx(1, 0)];
+          sum += s[idx(x - 1, y - 1, w)] * K[0][0];
+          sum += s[idx(x, y - 1, w)] * K[1][0];
+          sum += s[idx(x + 1, y - 1, w)] * K[2][0];
+          sum += s[idx(x - 1, y, w)] * K[0][1];
+          sum += s[idx(x + 1, y, w)] * K[2][1];
         }
       } else {  // at top boundary, but not corner
-        sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
-        sum += s[idx(x + 1, y, w)] * K[k_idx(1, 0)];
-        sum += s[idx(x - 1, y + 1, w)] * K[k_idx(-1, 1)];
-        sum += s[idx(x, y + 1, w)] * K[k_idx(0, 1)];
-        sum += s[idx(x + 1, y + 1, w)] * K[k_idx(1, 1)];
+        sum += s[idx(x - 1, y, w)] * K[0][1];
+        sum += s[idx(x + 1, y, w)] * K[2][1];
+        sum += s[idx(x - 1, y + 1, w)] * K[0][2];
+        sum += s[idx(x, y + 1, w)] * K[1][2];
+        sum += s[idx(x + 1, y + 1, w)] * K[2][2];
       }
     } else {              // somewhere at the right boundary
       if (y > 0) {        // not at the top boundary
         if (y < h - 1) {  // at the right boundary, but not corner
-          sum += s[idx(x - 1, y - 1, w)] * K[k_idx(-1, -1)];
-          sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-          sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
-          sum += s[idx(x - 1, y + 1, w)] * K[k_idx(-1, 1)];
-          sum += s[idx(x, y + 1, w)] * K[k_idx(0, 1)];
+          sum += s[idx(x - 1, y - 1, w)] * K[0][0];
+          sum += s[idx(x, y - 1, w)] * K[1][0];
+          sum += s[idx(x - 1, y, w)] * K[0][1];
+          sum += s[idx(x - 1, y + 1, w)] * K[0][2];
+          sum += s[idx(x, y + 1, w)] * K[1][2];
         } else {  // at bottom right corner
-          sum += s[idx(x - 1, y - 1, w)] * K[k_idx(-1, -1)];
-          sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-          sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
+          sum += s[idx(x - 1, y - 1, w)] * K[0][0];
+          sum += s[idx(x, y - 1, w)] * K[1][0];
+          sum += s[idx(x - 1, y, w)] * K[0][1];
         }
       } else {  // at the top right corner
-        sum += s[idx(x - 1, y, w)] * K[k_idx(-1, 0)];
-        sum += s[idx(x - 1, y + 1, w)] * K[k_idx(-1, 1)];
-        sum += s[idx(x, y + 1, w)] * K[k_idx(0, 1)];
+        sum += s[idx(x - 1, y, w)] * K[0][1];
+        sum += s[idx(x - 1, y + 1, w)] * K[0][2];
+        sum += s[idx(x, y + 1, w)] * K[1][2];
       }
     }
   } else {              // somewhere at the left boundary
     if (y > 0) {        // not at the top left corner
       if (y < h - 1) {  // at the left boundary, but not at corner
-        sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-        sum += s[idx(x + 1, y - 1, w)] * K[k_idx(1, -1)];
-        sum += s[idx(x + 1, y, w)] * K[k_idx(1, 0)];
-        sum += s[idx(x, y + 1, w)] * K[k_idx(0, 1)];
-        sum += s[idx(x + 1, y + 1, w)] * K[k_idx(1, 1)];
+        sum += s[idx(x, y - 1, w)] * K[1][0];
+        sum += s[idx(x + 1, y - 1, w)] * K[2][0];
+        sum += s[idx(x + 1, y, w)] * K[2][1];
+        sum += s[idx(x, y + 1, w)] * K[1][2];
+        sum += s[idx(x + 1, y + 1, w)] * K[2][2];
       } else {  // at the bottom left corner
-        sum += s[idx(x, y - 1, w)] * K[k_idx(0, -1)];
-        sum += s[idx(x + 1, y - 1, w)] * K[k_idx(1, -1)];
-        sum += s[idx(x + 1, y, w)] * K[k_idx(1, 0)];
+        sum += s[idx(x, y - 1, w)] * K[1][0];
+        sum += s[idx(x + 1, y - 1, w)] * K[2][0];
+        sum += s[idx(x + 1, y, w)] * K[2][1];
       }
     } else {  // at the top left corner
-      sum += s[idx(x + 1, y, w)] * K[k_idx(1, 0)];
-      sum += s[idx(x, y + 1, w)] * K[k_idx(0, 1)];
-      sum += s[idx(x + 1, y + 1, w)] * K[k_idx(1, 1)];
+      sum += s[idx(x + 1, y, w)] * K[2][1];
+      sum += s[idx(x, y + 1, w)] * K[1][2];
+      sum += s[idx(x + 1, y + 1, w)] * K[2][2];
     }
   }
   return (sum);

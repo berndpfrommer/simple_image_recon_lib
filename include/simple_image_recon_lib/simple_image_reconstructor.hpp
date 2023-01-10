@@ -31,8 +31,15 @@ class SimpleImageReconstructor
 {
 public:
   typedef float state_t;
-  static constexpr std::array<state_t, 9> GAUSSIAN_3x3 = {0.0625, 0.125,  0.0625, 0.125, 0.25,
-                                                          0.125,  0.0625, 0.125,  0.0625};
+  static constexpr std::array<std::array<state_t, 3>, 3> GAUSSIAN_3x3 = {
+    {{0.0625, 0.125, 0.0625}, {0.125, 0.25, 0.125}, {0.0625, 0.125, 0.0625}}};
+  static constexpr std::array<std::array<state_t, 5>, 5> GAUSSIAN_5x5 = {
+    {{0.003663, 0.01465201, 0.02564103, 0.01465201, 0.003663},
+     {0.01465201, 0.05860806, 0.0952381, 0.05860806, 0.01465201},
+     {0.02564103, 0.0952381, 0.15018315, 0.0952381, 0.02564103},
+     {0.01465201, 0.05860806, 0.0952381, 0.05860806, 0.01465201},
+     {0.003663, 0.01465201, 0.02564103, 0.01465201, 0.003663}}};
+
   class State
   {
   public:
@@ -63,7 +70,7 @@ public:
     inline void setL_lag(state_t f) { L_lag = f; }
     inline void setP(int8_t i) { p = i; }
 
-  private:
+    // make variables public so they can be exposed to e.g. pybind11
     // ------ variables -------
     state_t L;
     state_t L_lag;
@@ -111,8 +118,8 @@ public:
         throw std::runtime_error("inactivating inactive pixel!");
       }
       s.markInActive();
-      // filter state spatially and mark as inactive
-      s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+      //s = spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+      s = spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
 
       // now update tile
       auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
@@ -138,6 +145,12 @@ public:
   void initialize(
     size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio);
   void getImage(uint8_t * img, size_t stride) const;
+  size_t getWidth() const { return (width_); }
+  size_t getHeight() const { return (height_); }
+
+  const std::vector<State> & getState() const { return (state_); }
+
+  size_t getEventWindowSize() const { return (eventWindowSize_); }
 
   inline size_t getTileIdx(uint16_t ex, uint16_t ey) const
   {
@@ -164,18 +177,18 @@ private:
   // ------------------- variables ------------------
   size_t width_{0};
   size_t height_{0};
-  std::vector<State> state_;  // filter state
+  std::vector<State> state_;         // filter state
   std::array<float, 3> c_{0, 0, 0};  // filter coefficients, see frequency cam paper
   // ---------- related to activity detection
   static constexpr int START_WINDOW_SIZE = 2000;
-  uint16_t tileSize_{0};            // width of tiles
-  uint16_t tileStrideY_{0};         // size of stride in tiled image
+  uint16_t tileSize_{0};                         // width of tiles
+  uint16_t tileStrideY_{0};                      // size of stride in tiled image
   uint64_t eventWindowSize_{START_WINDOW_SIZE};  // current event window size
-  uint64_t fillRatioDenom_{2};      // denominator of fill ratio
-  uint64_t fillRatioNum_{1};        // numerator of fill ratio
-  uint64_t numOccupiedPixels_{0};   // currently occupied number of pixels
-  uint64_t numOccupiedTiles_{0};    // currently occupied number of blocks
-  std::queue<Event> events_;        // queue with buffered events
+  uint64_t fillRatioDenom_{2};                   // denominator of fill ratio
+  uint64_t fillRatioNum_{1};                     // numerator of fill ratio
+  uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
+  uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
+  std::queue<Event> events_;                     // queue with buffered events
   static constexpr int ACTIVITY_BIT = 7;
 };
 }  // namespace simple_image_recon_lib

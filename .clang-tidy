@@ -1,5 +1,5 @@
 ---
-Checks:          '*,-fuchsia-default-arguments-declarations,-fuchsia-overloaded-operator,-fuchsia-default-arguments-calls,-modernize-use-trailing-return-type,-hicpp-signed-bitwise,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers'
+Checks:          '*,-fuchsia-default-arguments-declarations,-fuchsia-overloaded-operator,-fuchsia-default-arguments-calls,-modernize-use-trailing-return-type,-hicpp-signed-bitwise,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers,-misc-non-private-member-variables-in-classes'
 WarningsAsErrors: true
 HeaderFilterRegex: '.'
 # AnalyzeTemporaryDtors: false
