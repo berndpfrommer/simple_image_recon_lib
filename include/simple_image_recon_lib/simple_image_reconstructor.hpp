@@ -59,12 +59,24 @@ public:
     inline state_t getL() const { return (L); }
     inline state_t getL_lag() const { return (L_lag); }
     inline int8_t getP() const { return (p); }
-    inline uint8_t getPixelCount() const { return (pixelCount & ((1 << ACTIVITY_BIT) - 1)); }
-    inline bool isActive() const { return ((pixelCount & (1 << ACTIVITY_BIT)) != 0); }
+    inline uint8_t getPixelCount() const { return (pixelCount & PIXEL_COUNT_MASK); }
+    inline bool isActive(int8_t p) const
+    {
+      return ((pixelCount & (p == 1 ? ACTIVITY_ON_MASK : ACTIVITY_OFF_MASK)) != 0);
+    }
+    inline bool isActive() const { return ((pixelCount & ACTIVITY_MASK) != 0); }
+
     inline void incPixelCount() { pixelCount++; }
     inline void decPixelCount() { pixelCount--; }
-    inline void markActive() { pixelCount |= (1 << ACTIVITY_BIT); }
-    inline void markInActive() { pixelCount &= ((1 << ACTIVITY_BIT) - 1); }
+    inline void markActive(int8_t p)
+    {
+      pixelCount |= (p == 1 ? ACTIVITY_ON_MASK : ACTIVITY_OFF_MASK);
+    }
+
+    inline void markInActive(int8_t p)
+    {
+      pixelCount &= (p == 1 ? (~ACTIVITY_ON_MASK) : (~ACTIVITY_OFF_MASK));
+    }
 
     inline void setL(state_t f) { L = f; }
     inline void setL_lag(state_t f) { L_lag = f; }
@@ -93,22 +105,24 @@ public:
     s.setL(L);
     s.setP(p);
     // run activity detector
-    if (!s.isActive()) {
-      // only mark pixel as active if it isn't already. Drops duplicate events
-      s.markActive();
+    if (!s.isActive(p)) {  // drop duplicate events of same polarity
+      if (!s.isActive()) {
+        // if other-polarity event already turned the pixel active, don't count it
+        numOccupiedPixels_++;
+      }
+      s.markActive(p);  // mark this polarity active
       // state of top left corner of tile has actual pixel-in-tile count
       auto & tile = state_[getTileIdx(ex, ey)];
-      numOccupiedPixels_++;
       events_.push(Event(ex, ey, p));
       if (tile.getPixelCount() == 0) {
-        numOccupiedTiles_++;  // no more pixels in this tile
+        numOccupiedTiles_++;  // first active pixel in this tile
       }
       tile.incPixelCount();  // bump number of pixels in this tile
-      updateEventWindowSize();
+      processEventQueue();   // adjusts size of event window
     }
   }
 
-  void updateEventWindowSize()
+  void processEventQueue()
   {
     while (events_.size() > eventWindowSize_) {
       const Event & e = events_.front();
@@ -117,22 +131,23 @@ public:
         std::cerr << e.x() << " " << e.y() << " is inactive!" << std::endl;
         throw std::runtime_error("inactivating inactive pixel!");
       }
-      s.markInActive();
-      //s = spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
-      s = spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
-
-      // now update tile
-      auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
-      if (tile.getPixelCount() == 0) {
-        std::cerr << e.x() << " " << e.y() << " tile is empty!" << std::endl;
-        throw std::runtime_error("empty tile!");
+      s.markInActive(e.p());
+      if (!s.isActive()) {  // wait for both polarities to be inactive
+        //s = spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+        s =
+          spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
+        auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
+        if (tile.getPixelCount() == 0) {
+          std::cerr << e.x() << " " << e.y() << " tile is empty!" << std::endl;
+          throw std::runtime_error("empty tile!");
+        }
+        // remove number of pixels in this tile
+        tile.decPixelCount();
+        if (tile.getPixelCount() == 0) {
+          numOccupiedTiles_--;
+        }
+        numOccupiedPixels_--;
       }
-      // remove number of pixels in this tile
-      tile.decPixelCount();
-      if (tile.getPixelCount() == 0) {
-        numOccupiedTiles_--;
-      }
-      numOccupiedPixels_--;
       events_.pop();  // remove element now
     }
     // adjust event window size up or down to match the fill ratio:
@@ -189,7 +204,14 @@ private:
   uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
   std::queue<Event> events_;                     // queue with buffered events
-  static constexpr int ACTIVITY_BIT = 7;
+  static constexpr uint8_t ACTIVITY_ON_BIT = 6;
+  static constexpr uint8_t ACTIVITY_OFF_BIT = 7;
+  static constexpr uint8_t ACTIVITY_LOW_BIT = ACTIVITY_ON_BIT;
+  static constexpr uint8_t ACTIVITY_ON_MASK = static_cast<uint8_t>(1) << ACTIVITY_ON_BIT;
+  static constexpr uint8_t ACTIVITY_OFF_MASK = static_cast<uint8_t>(1) << ACTIVITY_OFF_BIT;
+  static constexpr uint8_t ACTIVITY_MASK = ACTIVITY_ON_MASK | ACTIVITY_OFF_MASK;
+  static constexpr uint8_t INV_ACTIVITY_MASK = static_cast<uint8_t>(~ACTIVITY_MASK);
+  static constexpr uint8_t PIXEL_COUNT_MASK = (1 << ACTIVITY_LOW_BIT) - 1;
 };
 }  // namespace simple_image_recon_lib
 #endif  // SIMPLE_IMAGE_RECON_LIB_SIMPLE_IMAGE_RECONSTRUCTOR_HPP

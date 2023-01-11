@@ -45,7 +45,7 @@ void SimpleImageReconstructor::initialize(
   c_[2] = 0.5 * (1 + beta);
   state_.resize(width * height, State());
   tileStrideY_ = width * tileSize;
-  constexpr int maxArea = (1 << ACTIVITY_BIT);
+  constexpr int maxArea = (1 << ACTIVITY_LOW_BIT);
   if (tileSize * tileSize > maxArea) {
     // guard against overflow of count of occupied pixels in tile
     std::cerr << "activity tile size too big: " << tileSize << " must be < "
