@@ -53,6 +53,7 @@ void SimpleImageReconstructor::initialize(
     throw(std::runtime_error("activity tile size too big"));
   }
   setFillRatio(fillRatio);
+  ActivityTileLayer::make_activity_tiles(&activityTileLayer_, width / 2, height / 2, 0.5);
 }
 
 void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
@@ -79,6 +80,14 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
       img[y_off + ix] = static_cast<uint8_t>((s.getL() - minL) * scale);
     }
   }
+}
+
+const ActivityTileLayer * SimpleImageReconstructor::getActivity(int layer) const
+{
+  if (layer < 0 || layer >= activityTileLayer_.size()) {
+    return (nullptr);
+  }
+  return (&activityTileLayer_[layer]);
 }
 
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
