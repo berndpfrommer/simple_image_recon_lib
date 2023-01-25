@@ -105,20 +105,20 @@ public:
     s.setL(L);
     s.setP(p);
     // run activity detector
-    if (!s.isActive(p)) {  // drop duplicate events of same polarity
+    if (!s.isActive(polarity)) {  // drop duplicate events of same polarity
       if (!s.isActive()) {
-        // if other-polarity event already turned the pixel active, don't count it
+        // no update if an opposite polarity event is already active
         numOccupiedPixels_++;
+        // state of top left corner of tile has actual pixel-in-tile count
+        auto & tile = state_[getTileIdx(ex, ey)];
+        if (tile.getPixelCount() == 0) {
+          numOccupiedTiles_++;  // first active pixel in this tile
+        }
+        tile.incPixelCount();  // bump number of pixels in this tile
       }
-      s.markActive(p);  // mark this polarity active
-      // state of top left corner of tile has actual pixel-in-tile count
-      auto & tile = state_[getTileIdx(ex, ey)];
-      events_.push(Event(ex, ey, p));
-      if (tile.getPixelCount() == 0) {
-        numOccupiedTiles_++;  // first active pixel in this tile
-      }
-      tile.incPixelCount();  // bump number of pixels in this tile
-      processEventQueue();   // adjusts size of event window
+      s.markActive(polarity);  // mark this polarity active
+      events_.push(Event(ex, ey, polarity));
+      processEventQueue();  // adjusts size of event window
     }
   }
 
@@ -138,7 +138,8 @@ public:
           spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
         if (tile.getPixelCount() == 0) {
-          std::cerr << e.x() << " " << e.y() << " tile is empty!" << std::endl;
+          std::cerr << e.x() << " " << e.y() << " tile " << getTileIdx(e.x(), e.y()) << " is empty!"
+                    << std::endl;
           throw std::runtime_error("empty tile!");
         }
         // remove number of pixels in this tile
