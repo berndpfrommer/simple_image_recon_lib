@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "simple_image_recon_lib/spatial_filter.hpp"
+#include "simple_image_recon_lib/state.hpp"
 
 namespace simple_image_recon_lib
 {
@@ -39,56 +40,6 @@ public:
      {0.02564103, 0.0952381, 0.15018315, 0.0952381, 0.02564103},
      {0.01465201, 0.05860806, 0.0952381, 0.05860806, 0.01465201},
      {0.003663, 0.01465201, 0.02564103, 0.01465201, 0.003663}}};
-
-  class State
-  {
-  public:
-    explicit State(state_t L_a = 0, state_t L_lag_a = 0, int8_t p_a = 0, uint8_t pc = 0)
-    : L(L_a), L_lag(L_lag_a), p(p_a), pixelCount(pc)
-    {
-    }
-    inline void operator+=(const State & s)
-    {
-      L += s.L;
-      L_lag += s.L_lag;
-      // leave other fields untouched
-    }
-
-    inline State operator*(const float c) const { return (State(c * L, c * L_lag)); }
-
-    inline state_t getL() const { return (L); }
-    inline state_t getL_lag() const { return (L_lag); }
-    inline int8_t getP() const { return (p); }
-    inline uint8_t getPixelCount() const { return (pixelCount & PIXEL_COUNT_MASK); }
-    inline bool isActive(int8_t p) const
-    {
-      return ((pixelCount & (p == 1 ? ACTIVITY_ON_MASK : ACTIVITY_OFF_MASK)) != 0);
-    }
-    inline bool isActive() const { return ((pixelCount & ACTIVITY_MASK) != 0); }
-
-    inline void incPixelCount() { pixelCount++; }
-    inline void decPixelCount() { pixelCount--; }
-    inline void markActive(int8_t p)
-    {
-      pixelCount |= (p == 1 ? ACTIVITY_ON_MASK : ACTIVITY_OFF_MASK);
-    }
-
-    inline void markInActive(int8_t p)
-    {
-      pixelCount &= (p == 1 ? (~ACTIVITY_ON_MASK) : (~ACTIVITY_OFF_MASK));
-    }
-
-    inline void setL(state_t f) { L = f; }
-    inline void setL_lag(state_t f) { L_lag = f; }
-    inline void setP(int8_t i) { p = i; }
-
-    // make variables public so they can be exposed to e.g. pybind11
-    // ------ variables -------
-    state_t L;
-    state_t L_lag;
-    int8_t p;
-    uint8_t pixelCount{0};
-  };
 
   SimpleImageReconstructor() = default;
 
@@ -111,10 +62,10 @@ public:
         numOccupiedPixels_++;
         // state of top left corner of tile has actual pixel-in-tile count
         auto & tile = state_[getTileIdx(ex, ey)];
-        if (tile.getPixelCount() == 0) {
+        if (tile.getNumActive() == 0) {
           numOccupiedTiles_++;  // first active pixel in this tile
         }
-        tile.incPixelCount();  // bump number of pixels in this tile
+        tile.incNumActive();  // bump number of pixels in this tile
       }
       s.markActive(polarity);  // mark this polarity active
       events_.push(Event(ex, ey, polarity));
@@ -137,14 +88,14 @@ public:
         s =
           spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
-        if (tile.getPixelCount() == 0) {
+        if (tile.getNumActive() == 0) {
           std::cerr << e.x() << " " << e.y() << " tile " << getTileIdx(e.x(), e.y()) << " is empty!"
                     << std::endl;
           throw std::runtime_error("empty tile!");
         }
         // remove number of pixels in this tile
-        tile.decPixelCount();
-        if (tile.getPixelCount() == 0) {
+        tile.decNumActive();
+        if (tile.getNumActive() == 0) {
           numOccupiedTiles_--;
         }
         numOccupiedPixels_--;

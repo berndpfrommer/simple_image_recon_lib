@@ -39,7 +39,7 @@ static T filter(
   const uint16_t y_min = std::max(0, static_cast<int>(y) - w);
   const uint16_t y_max = std::min(static_cast<int>(y) + w + 1, static_cast<int>(height));
 
-  T sum(0, 0, 0, state[idx(x, y, width)].getPixelCount());
+  T sum(0, 0, 0, state[idx(x, y, width)].getActivity());
 
   for (uint16_t iy = y_min; iy < y_max; iy++) {
     const int ky = iy - y + w;
