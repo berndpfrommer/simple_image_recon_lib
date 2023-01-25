@@ -36,6 +36,8 @@ void SimpleImageReconstructor::initialize(
   width_ = width;
   height_ = height;
   tileSize_ = tileSize;
+  tileArea_ = static_cast<state_t>(tileSize_ * tileSize_);
+  invTileArea_ = static_cast<state_t>(1.0) / tileArea_;
   // compute filter coefficients
   double alpha(0);
   double beta(0);
@@ -44,8 +46,9 @@ void SimpleImageReconstructor::initialize(
   c_[1] = -alpha * beta;
   c_[2] = 0.5 * (1 + beta);
   state_.resize(width * height, State());
-  tileStrideY_ = width * tileSize;
-  constexpr int maxArea = (1 << ACTIVITY_LOW_BIT);
+  tileStrideY_ = (width / tileSize_);
+  tile_.resize(tileStrideY_ * (height_ / tileSize_));
+  constexpr int maxArea = State::max_num_active();
   if (tileSize * tileSize > maxArea) {
     // guard against overflow of count of occupied pixels in tile
     std::cerr << "activity tile size too big: " << tileSize << " must be < "
@@ -54,6 +57,10 @@ void SimpleImageReconstructor::initialize(
   }
   setFillRatio(fillRatio);
   ActivityTileLayer::make_activity_tiles(&activityTileLayer_, width / 2, height / 2, 0.5);
+  for (int i = 1; i < activityTileLayer_.size(); i++) {
+    activityTileLayer_[i].setSubtiles(&activityTileLayer_[i - 1]);
+  }
+  activityTileLayer_[0].setSubtiles(this);
 }
 
 void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const

@@ -29,8 +29,12 @@ ActivityTileLayer::ActivityTileLayer(
   tile_.resize(tileStrideY_ * (height / tileSizeY));
   activeOnThreshold_ =
     static_cast<uint32_t>(fillRatioThreshold * static_cast<float>(tileSizeX_ * tileSizeY_));
+  tileArea_ = static_cast<float>(tileSizeX_ * tileSizeY_);
+  invTileArea_ = 1.0F / tileArea_;
+#if 0  
   std::cout << "created layer: nst: " << width << " x " << height << " -> " << tileStrideY_ << " x "
             << (height / tileSizeY) << " num tiles: " << tile_.size() << std::endl;
+#endif
 }
 
 static bool find_factor(
@@ -61,15 +65,15 @@ void ActivityTileLayer::make_activity_tiles(
   uint32_t w = width;
   uint32_t h = height;
   layers->clear();
-
   bool doneFactoring(false);
-  while (!doneFactoring) {
+  for (uint32_t level = 0; !doneFactoring; level++) {
     uint32_t tileWidth(0);
     uint32_t tileHeight(0);
     uint32_t newWidth(0);
     uint32_t newHeight(0);
     doneFactoring = find_factor(w, &newWidth, &tileWidth, h, &newHeight, &tileHeight);
     layers->emplace_back(w, h, tileWidth, tileHeight, fillRatioThreshold);
+    layers->back().setLevel(level);
     w = newWidth;
     h = newHeight;
   }
