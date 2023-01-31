@@ -19,6 +19,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <queue>
 #include <vector>
@@ -40,11 +41,14 @@ public:
      {0.02564103, 0.0952381, 0.15018315, 0.0952381, 0.02564103},
      {0.01465201, 0.05860806, 0.0952381, 0.05860806, 0.01465201},
      {0.003663, 0.01465201, 0.02564103, 0.01465201, 0.003663}}};
+  static constexpr std::array<std::array<state_t, 3>, 3> FAKE_3x3 = {
+    {{0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 0.0}}};
 
   SimpleImageReconstructor() = default;
 
-  void event(uint16_t ex, uint16_t ey, uint8_t polarity)
+  void event(uint32_t t, uint16_t ex, uint16_t ey, uint8_t polarity)
   {
+    static std::ofstream event_active("event_active.txt");
     auto & s = state_[ey * width_ + ex];
     int8_t p = static_cast<bool>(polarity) ? 1 : -1;
     // raw change in polarity, will be 0 or +-2
@@ -66,15 +70,21 @@ public:
           numOccupiedTiles_++;  // first active pixel in this tile
         }
         tile.incNumActive();  // bump number of pixels in this tile
+        if (ex == 319 && ey == 239) {
+          event_active << t << std::endl;
+        }
       }
       s.markActive(polarity);  // mark this polarity active
-      events_.push(Event(ex, ey, polarity));
+      events_.push(Event(t, ex, ey, polarity));
       processEventQueue();  // adjusts size of event window
     }
+    currentTime_ = t;
   }
 
   void processEventQueue()
   {
+    static std::ofstream wsize("window_size.txt");
+    static std::ofstream event_inactive("event_inactive.txt");
     while (events_.size() > eventWindowSize_) {
       const Event & e = events_.front();
       auto & s = state_[e.y() * width_ + e.x()];
@@ -84,9 +94,11 @@ public:
       }
       s.markInActive(e.p());
       if (!s.isActive()) {  // wait for both polarities to be inactive
-        //s = spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
-        s =
-          spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
+        // s =  spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+        s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+        // s =
+        spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
+
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
         if (tile.getNumActive() == 0) {
           std::cerr << e.x() << " " << e.y() << " tile " << getTileIdx(e.x(), e.y()) << " is empty!"
@@ -99,6 +111,9 @@ public:
           numOccupiedTiles_--;
         }
         numOccupiedPixels_--;
+        if (e.x() == 319 && e.y() == 239) {
+          event_inactive << currentTime_ << " " << e.t() << " " << eventWindowSize_ << std::endl;
+        }
       }
       events_.pop();  // remove element now
     }
@@ -128,12 +143,16 @@ private:
   class Event
   {
   public:
-    explicit Event(uint16_t x, uint16_t y, int8_t p) : ex(x), ey(y), ep(p) {}
+    explicit Event(uint32_t t_a, uint16_t x, uint16_t y, int8_t p) : time(t_a), ex(x), ey(y), ep(p)
+    {
+    }
+    uint32_t t() const { return (time); }
     uint16_t x() const { return (ex); }
     uint16_t y() const { return (ey); }
     int8_t p() const { return (ep); }
 
   private:
+    uint32_t time;
     uint16_t ex;
     uint16_t ey;
     int8_t ep;
@@ -156,6 +175,8 @@ private:
   uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
   std::queue<Event> events_;                     // queue with buffered events
+  // -------- debugging
+  uint32_t currentTime_{0};
   static constexpr uint8_t ACTIVITY_ON_BIT = 6;
   static constexpr uint8_t ACTIVITY_OFF_BIT = 7;
   static constexpr uint8_t ACTIVITY_LOW_BIT = ACTIVITY_ON_BIT;
