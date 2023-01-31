@@ -40,7 +40,7 @@ static T filter(
   const uint16_t y_max = std::min(static_cast<int>(y) + w + 1, static_cast<int>(height));
 
   const auto & cs = state[idx(x, y, width)];
-  T sum(0, 0, cs.getP(), cs.getNumPixActive(), cs.getNumEventsInQueue());
+  T sum(0, cs.getPBar(), cs.getNumPixActive(), cs.getNumEventsInQueue());
 
   for (uint16_t iy = y_min; iy < y_max; iy++) {
     const int ky = iy - y + w;
@@ -63,8 +63,7 @@ static T filter_3x3(
   const auto cc = K[1][1];
   const auto & center = s[idx(x, y, w)];
   T sum(
-    center.getL() * cc, center.getL_lag() * cc, center.getP(), center.getNumPixActive(),
-    center.getNumEventsInQueue());
+    center.getL() * cc, center.getPbar(), center.getNumPixActive(), center.getNumEventsInQueue());
 
   if (x > 0) {            // not at the left boundary
     if (x < w - 1) {      // not at the right boundary

@@ -26,26 +26,22 @@ class State
 {
 public:
   using state_t = float;
-  explicit State(
-    state_t L_a = 0, state_t L_lag_a = 0, int8_t p_a = 0, uint8_t npa = 0, uint16_t neiq = 0)
-  : L(L_a), L_lag(L_lag_a), p(p_a), numPixActive(npa), numEventsInQueue(neiq)
+  explicit State(state_t L_a = 0, state_t pbar_a = 0, uint8_t npa = 0, uint16_t neiq = 0)
+  : L(L_a), pbar(pbar_a), numPixActive(npa), numEventsInQueue(neiq)
   {
   }
   inline void operator+=(const State & s)
   {
     L += s.L;
-    L_lag += s.L_lag;
     // leave other fields untouched
   }
 
-  inline State operator*(const float c) const { return (State(c * L, c * L_lag)); }
+  inline State operator*(const float c) const { return (State(c * L)); }
 
   inline state_t getL() const { return (L); }
-  inline state_t getL_lag() const { return (L_lag); }
-  inline int8_t getP() const { return (p); }
+  inline state_t getPbar() const { return (pbar); }
   inline void setL(state_t f) { L = f; }
-  inline void setL_lag(state_t f) { L_lag = f; }
-  inline void setP(int8_t i) { p = i; }
+  inline void setPbar(state_t f) { pbar = f; }
 
   // ----------- related to activity -----------------------
   uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
@@ -60,8 +56,7 @@ public:
   // make variables public so they can be exposed to e.g. pybind11
   // ------ variables -------
   state_t L{0};
-  state_t L_lag{0};
-  int8_t p{0};
+  state_t pbar{0};
   uint8_t numPixActive{0};
   uint16_t numEventsInQueue{0};
 

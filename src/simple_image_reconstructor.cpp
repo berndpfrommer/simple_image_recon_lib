@@ -27,8 +27,7 @@ static void compute_alpha_beta(const double T_cut, double * alpha, double * beta
   const double omega_cut = 2 * M_PI / T_cut;
   const double phi = 2 - std::cos(omega_cut);
   *alpha = (1.0 - std::sin(omega_cut)) / std::cos(omega_cut);
-  // *beta = phi - std::sqrt(phi * phi - 1.0);  // see paper
-  *beta = 1.0;  // XXX
+  *beta = phi - std::sqrt(phi * phi - 1.0);  // see paper
 }
 
 void SimpleImageReconstructor::initialize(
@@ -41,9 +40,10 @@ void SimpleImageReconstructor::initialize(
   double alpha(0);
   double beta(0);
   compute_alpha_beta(static_cast<double>(cutoffTime), &alpha, &beta);
-  c_[0] = alpha + beta;
-  c_[1] = -alpha * beta;
-  c_[2] = 0.5 * (1 + beta);
+  c_[0] = alpha;
+  c_[1] = 1.0 - alpha;
+  c_[2] = beta;
+  c_[3] = 0.5 * (1 + beta);
   state_.resize(width * height, State());
   tileStrideY_ = width * tileSize;
   constexpr int maxArea = (1 << ACTIVITY_LOW_BIT);

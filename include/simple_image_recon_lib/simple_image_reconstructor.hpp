@@ -51,19 +51,18 @@ public:
     static std::ofstream event_active("event_active.txt");
     static std::ofstream state_debug("state.txt");
     auto & s = state_[ey * width_ + ex];
-    int8_t p = static_cast<bool>(polarity) ? 1 : -1;
+    const auto p = static_cast<state_t>((polarity == 0) ? -1 : 1);
     // raw change in polarity, will be 0 or +-2
-    const auto dp = static_cast<float>(p - s.getP());
+    const auto dp = static_cast<float>(p - s.getPbar());
     // run the temporal filter
-    const auto L = c_[0] * s.getL() + c_[1] * s.getL_lag() + c_[2] * dp;
+    const auto L = c_[2] * s.getL() + c_[3] * dp;
     if (ex == 319 && ey == 239) {
-      state_debug << t << " " << L << " " << s.getL() << " " << s.getL_lag() << " " << (int)s.getP()
-                  << " " << dp << std::endl;
+      state_debug << t << " " << L << " " << s.getL() << " " << s.getPbar() << " " << (int)p << " "
+                  << dp << std::endl;
     }
     // update state
-    s.setL_lag(s.getL());
+    s.setPbar(s.getPbar() * c_[0] + p * c_[1]);
     s.setL(L);
-    s.setP(p);
     // run activity detector
     if (!s.isActive()) {
       numOccupiedPixels_++;
@@ -103,8 +102,8 @@ public:
         s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         // s = spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         if (e.x() == 319 && e.y() == 239) {
-          filtering << currentTime_ << " " << s_old.getL() << " " << s_old.getL_lag() << " "
-                    << s.getL() << " " << s.getL_lag() << std::endl;
+          filtering << currentTime_ << " " << s_old.getL() << " " << s_old.getPbar() << " "
+                    << s.getL() << " " << s.getPbar() << std::endl;
         }
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
         if (tile.getNumPixActive() == 0) {
@@ -170,8 +169,8 @@ private:
   // ------------------- variables ------------------
   size_t width_{0};
   size_t height_{0};
-  std::vector<State> state_;         // filter state
-  std::array<float, 3> c_{0, 0, 0};  // filter coefficients, see frequency cam paper
+  std::vector<State> state_;            // filter state
+  std::array<float, 4> c_{0, 0, 0, 0};  // filter coefficients
   // ---------- related to activity detection
   static constexpr int START_WINDOW_SIZE = 2000;
   uint16_t tileSize_{0};                         // width of tiles
