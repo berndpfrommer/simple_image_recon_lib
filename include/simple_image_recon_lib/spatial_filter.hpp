@@ -40,7 +40,7 @@ static T filter(
   const uint16_t y_max = std::min(static_cast<int>(y) + w + 1, static_cast<int>(height));
 
   const auto & cs = state[idx(x, y, width)];
-  T sum(0, cs.getPBar(), cs.getNumPixActive(), cs.getNumEventsInQueue());
+  T sum(0, cs.getPbar(), cs.getNumPixActive(), cs.getNumEventsInQueue());
 
   for (uint16_t iy = y_min; iy < y_max; iy++) {
     const int ky = iy - y + w;

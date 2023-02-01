@@ -57,8 +57,8 @@ public:
     // run the temporal filter
     const auto L = c_[2] * s.getL() + c_[3] * dp;
     if (ex == 319 && ey == 239) {
-      state_debug << t << " " << L << " " << s.getL() << " " << s.getPbar() << " " << (int)p << " "
-                  << dp << std::endl;
+      state_debug << t << " " << L << " " << s.getL() << " " << s.getPbar() << " "
+                  << static_cast<int>(p) << " " << dp << std::endl;
     }
     // update state
     s.setPbar(s.getPbar() * c_[0] + p * c_[1]);
@@ -100,7 +100,8 @@ public:
         State s_old = s;
         // s =  spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
-        // s = spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
+        //s =
+        //spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         if (e.x() == 319 && e.y() == 239) {
           filtering << currentTime_ << " " << s_old.getL() << " " << s_old.getPbar() << " "
                     << s.getL() << " " << s.getPbar() << std::endl;
