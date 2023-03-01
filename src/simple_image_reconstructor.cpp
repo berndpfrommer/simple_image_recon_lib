@@ -84,7 +84,6 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
 
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
 {
-  std::cout << "setting fill ratio: " << fill_ratio << std::endl;
   fillRatioDenom_ = 100;
   // how many tiles per pixel when fully filled
   const double tiles_per_pixel = 1.0 / (tileSize_ * tileSize_);
@@ -92,8 +91,6 @@ void SimpleImageReconstructor::setFillRatio(double fill_ratio)
   const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
   const double nt_np = tiles_per_pixel / r;
   fillRatioNum_ = static_cast<uint64_t>(nt_np * fillRatioDenom_);
-  std::cout << "fill ratio num: " << fillRatioNum_ << std::endl;
-  std::cout << "fill ratio denom: " << fillRatioDenom_ << std::endl;
 }
 
 }  // namespace simple_image_recon_lib
