@@ -48,18 +48,12 @@ public:
 
   void event(uint32_t t, uint16_t ex, uint16_t ey, uint8_t polarity)
   {
-    static std::ofstream event_active("event_active.txt");
-    static std::ofstream state_debug("state.txt");
     auto & s = state_[ey * width_ + ex];
     const auto p = static_cast<state_t>((polarity == 0) ? -1 : 1);
     // raw change in polarity, will be 0 or +-2
     const auto dp = static_cast<float>(p - s.getPbar());
     // run the temporal filter
     const auto L = c_[2] * s.getL() + c_[3] * dp;
-    if (ex == 319 && ey == 239) {
-      state_debug << t << " " << L << " " << s.getL() << " " << s.getPbar() << " "
-                  << static_cast<int>(p) << " " << dp << std::endl;
-    }
     // update state
     s.setPbar(s.getPbar() * c_[0] + p * c_[1]);
     s.setL(L);
@@ -72,10 +66,6 @@ public:
         numOccupiedTiles_++;  // first active pixel in this tile
       }
       tile.incNumPixActive();  // bump number of pixels in this tile
-      // no update if an opposite polarity event is already active
-      if (ex == 319 && ey == 239) {
-        event_active << t << std::endl;
-      }
     }
     s.incNumEventsInQueue();
     events_.push(Event(t, ex, ey, polarity));
@@ -85,9 +75,6 @@ public:
 
   void processEventQueue()
   {
-    static std::ofstream wsize("window_size.txt");
-    static std::ofstream event_inactive("event_inactive.txt");
-    static std::ofstream filtering("filtering.txt");
     while (events_.size() > eventWindowSize_) {
       const Event & e = events_.front();
       auto & s = state_[e.y() * width_ + e.x()];
@@ -102,10 +89,6 @@ public:
         s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         //s =
         //spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
-        if (e.x() == 319 && e.y() == 239) {
-          filtering << currentTime_ << " " << s_old.getL() << " " << s_old.getPbar() << " "
-                    << s.getL() << " " << s.getPbar() << std::endl;
-        }
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
         if (tile.getNumPixActive() == 0) {
           std::cerr << e.x() << " " << e.y() << " tile " << getTileIdx(e.x(), e.y()) << " is empty!"
@@ -118,9 +101,6 @@ public:
           numOccupiedTiles_--;
         }
         numOccupiedPixels_--;
-        if (e.x() == 319 && e.y() == 239) {
-          event_inactive << currentTime_ << " " << e.t() << " " << eventWindowSize_ << std::endl;
-        }
       }
       events_.pop();  // remove element now
     }
