@@ -40,10 +40,10 @@ void SimpleImageReconstructor::initialize(
   double alpha(0);
   double beta(0);
   compute_alpha_beta(static_cast<double>(cutoffTime), &alpha, &beta);
-  c_[0] = alpha;
-  c_[1] = 1.0 - alpha;
-  c_[2] = beta;
-  c_[3] = 0.5 * (1 + beta);
+  c_[0] = static_cast<float>(alpha);
+  c_[1] = static_cast<float>(1.0 - alpha);
+  c_[2] = static_cast<float>(beta);
+  c_[3] = static_cast<float>(0.5 * (1 + beta));
   state_.resize(width * height, State());
   tileStrideY_ = width * tileSize;
   constexpr int maxArea = (1 << ACTIVITY_LOW_BIT);
@@ -90,7 +90,7 @@ void SimpleImageReconstructor::setFillRatio(double fill_ratio)
   // a fill ratio below 1 pixel per tile is not achievable
   const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
   const double nt_np = tiles_per_pixel / r;
-  fillRatioNum_ = static_cast<uint64_t>(nt_np * fillRatioDenom_);
+  fillRatioNum_ = static_cast<uint64_t>(nt_np * static_cast<double>(fillRatioDenom_));
 }
 
 }  // namespace simple_image_recon_lib

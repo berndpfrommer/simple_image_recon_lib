@@ -32,7 +32,7 @@ namespace simple_image_recon_lib
 class SimpleImageReconstructor
 {
 public:
-  typedef float state_t;
+  using state_t = float;
   static constexpr std::array<std::array<state_t, 3>, 3> GAUSSIAN_3x3 = {
     {{0.0625, 0.125, 0.0625}, {0.125, 0.25, 0.125}, {0.0625, 0.125, 0.0625}}};
   static constexpr std::array<std::array<state_t, 5>, 5> GAUSSIAN_5x5 = {
@@ -68,7 +68,7 @@ public:
       tile.incNumPixActive();  // bump number of pixels in this tile
     }
     s.incNumEventsInQueue();
-    events_.push(Event(t, ex, ey, polarity));
+    events_.push(Event(t, ex, ey, static_cast<int8_t>(polarity)));
     processEventQueue();  // adjusts size of event window
     currentTime_ = t;
   }
@@ -86,7 +86,7 @@ public:
       if (!s.isActive()) {
         State s_old = s;
         // s =  spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
-        s = spatial_filter::filter_3x3(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+        s = spatial_filter::filter_3x3(state_.data(), e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         //s =
         //spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
