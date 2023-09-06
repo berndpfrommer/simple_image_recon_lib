@@ -84,7 +84,6 @@ public:
       }
       s.decNumEventsInQueue();
       if (!s.isActive()) {
-        State s_old = s;
         // s =  spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         s = spatial_filter::filter_3x3(state_.data(), e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
         //s =
