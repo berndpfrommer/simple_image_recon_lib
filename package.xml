@@ -5,7 +5,7 @@
   <description>simple image reconstruction library package</description>
   <maintainer email="bernd.pfrommer@gmail.com">Bernd Pfrommer</maintainer>
   <license>Apache2</license>
-
+  <depend>clang-tidy</depend>
   <export>
     <build_type>cmake</build_type>
   </export>
