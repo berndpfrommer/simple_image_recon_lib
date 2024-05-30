@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.15)
 
 project(simple_image_recon_lib VERSION 1.0 LANGUAGES CXX)
 
@@ -21,7 +21,7 @@ include(CMakePackageConfigHelpers)
 include (GNUInstallDirs)
 
 
-set(CMAKE_CXX_CLANG_TIDY clang-tidy)
+# set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(${PROJECT_NAME} SHARED src/simple_image_reconstructor.cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES  CXX_STANDARD 14)
