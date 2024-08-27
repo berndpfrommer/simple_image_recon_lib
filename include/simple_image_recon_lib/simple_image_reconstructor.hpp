@@ -22,10 +22,11 @@
 #include <fstream>
 #include <iostream>
 #include <queue>
+#include <simple_image_recon_lib/event.hpp>
+#include <simple_image_recon_lib/spatial_filter.hpp>
+#include <simple_image_recon_lib/state.hpp>
+#include <simple_image_recon_lib/time_keeper.hpp>
 #include <vector>
-
-#include "simple_image_recon_lib/spatial_filter.hpp"
-#include "simple_image_recon_lib/state.hpp"
 
 namespace simple_image_recon_lib
 {
@@ -126,29 +127,12 @@ public:
   }
 
 private:
-  class Event
-  {
-  public:
-    explicit Event(uint32_t t_a, uint16_t x, uint16_t y, int8_t p) : time(t_a), ex(x), ey(y), ep(p)
-    {
-    }
-    uint32_t t() const { return (time); }
-    uint16_t x() const { return (ex); }
-    uint16_t y() const { return (ey); }
-    int8_t p() const { return (ep); }
-
-  private:
-    uint32_t time;
-    uint16_t ex;
-    uint16_t ey;
-    int8_t ep;
-  };
-
   void setFillRatio(double fill_ratio);
 
   // ------------------- variables ------------------
   size_t width_{0};
   size_t height_{0};
+  TimeKeeper time_keeper_;
   std::vector<State> state_;            // filter state
   std::array<float, 4> c_{0, 0, 0, 0};  // filter coefficients
   // ---------- related to activity detection

@@ -36,6 +36,7 @@ void SimpleImageReconstructor::initialize(
   width_ = width;
   height_ = height;
   tileSize_ = tileSize;
+  time_keeper_.initialize(width, height);
   // compute filter coefficients
   double alpha(0);
   double beta(0);
