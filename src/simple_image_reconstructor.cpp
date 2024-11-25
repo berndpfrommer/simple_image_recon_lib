@@ -45,15 +45,22 @@ void SimpleImageReconstructor::initialize(
   c_[2] = static_cast<float>(beta);
   c_[3] = static_cast<float>(0.5 * (1 + beta));
   state_.resize(width * height, State());
-  tileStrideY_ = width * tileSize;
+  tileStrideY_ = width * tileSize_;
   constexpr int maxArea = (1 << ACTIVITY_LOW_BIT);
-  if (tileSize * tileSize > maxArea) {
+  if (tileSize_ * tileSize_ > maxArea) {
     // guard against overflow of count of occupied pixels in tile
-    std::cerr << "activity tile size too big: " << tileSize << " must be < "
+    std::cerr << "activity tile size too big: " << tileSize_ << " must be < "
               << static_cast<int>(std::sqrt(maxArea)) << std::endl;
     throw(std::runtime_error("activity tile size too big"));
   }
   setFillRatio(fillRatio);
+  // disable any queue usage if tile size is set to zero
+  maxWindowSize_ = tileSize_ > 0 ? width_ * height_ : 0;
+#ifdef USE_CIRCULAR_BUFFER
+  events_ = CircularBuffer<Event>(maxWindowSize_);
+#endif
+  std::cout << "state size: " << sizeof(State) << " " << width * height * sizeof(State) << " bytes "
+            << " max win: " << maxWindowSize_ << std::endl;
 }
 
 void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
@@ -85,12 +92,14 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
 {
   fillRatioDenom_ = 100;
-  // how many tiles per pixel when fully filled
-  const double tiles_per_pixel = 1.0 / (tileSize_ * tileSize_);
-  // a fill ratio below 1 pixel per tile is not achievable
-  const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
-  const double nt_np = tiles_per_pixel / r;
-  fillRatioNum_ = static_cast<uint64_t>(nt_np * static_cast<double>(fillRatioDenom_));
+  if (tileSize_ > 0) {
+    // how many tiles per pixel when fully filled
+    const double tiles_per_pixel = 1.0 / (tileSize_ * tileSize_);
+    // a fill ratio below 1 pixel per tile is not achievable
+    const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
+    const double nt_np = tiles_per_pixel / r;
+    fillRatioNum_ = static_cast<uint64_t>(nt_np * static_cast<double>(fillRatioDenom_));
+  }
 }
 
 }  // namespace simple_image_recon_lib

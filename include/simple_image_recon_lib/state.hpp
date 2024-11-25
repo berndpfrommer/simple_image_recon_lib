@@ -20,6 +20,8 @@
 #include <cstddef>
 #include <cstdint>
 
+// #define MINIMAL_STATE
+
 namespace simple_image_recon_lib
 {
 class State
@@ -27,7 +29,13 @@ class State
 public:
   using state_t = float;
   explicit State(state_t L_a = 0, state_t pbar_a = 0, uint8_t npa = 0, uint16_t neiq = 0)
-  : L(L_a), pbar(pbar_a), numPixActive(npa), numEventsInQueue(neiq)
+  : L(L_a),
+    pbar(pbar_a)
+#ifndef MINIMAL_STATE
+    ,
+    numPixActive(npa),
+    numEventsInQueue(neiq)
+#endif
   {
   }
   inline void operator+=(const State & s)
@@ -44,6 +52,7 @@ public:
   inline void setPbar(state_t f) { pbar = f; }
 
   // ----------- related to activity -----------------------
+#ifndef MINIMAL_STATE
   uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
   uint8_t getNumPixActive() const { return (numPixActive); }
 
@@ -52,14 +61,15 @@ public:
   inline void decNumPixActive() { numPixActive--; }
   inline void incNumEventsInQueue() { numEventsInQueue++; }
   inline void decNumEventsInQueue() { numEventsInQueue--; }
-
+#endif
   // make variables public so they can be exposed to e.g. pybind11
   // ------ variables -------
   state_t L{0};
   state_t pbar{0};
+#ifndef MINIMAL_STATE
   uint8_t numPixActive{0};
   uint16_t numEventsInQueue{0};
-
+#endif
   static constexpr int max_num_active() { return (255); };  // 8 bit
 
 private:

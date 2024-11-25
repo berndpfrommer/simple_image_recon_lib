@@ -16,16 +16,21 @@
 #ifndef SIMPLE_IMAGE_RECON_LIB_SIMPLE_IMAGE_RECONSTRUCTOR_HPP
 #define SIMPLE_IMAGE_RECON_LIB_SIMPLE_IMAGE_RECONSTRUCTOR_HPP
 
+// #define USE_CIRCULAR_BUFFER
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#ifdef USE_CIRCULAR_BUFFER
+#include <simple_image_recon_lib/circular_buffer.hpp>
+#else
 #include <queue>
+#endif
+#include <simple_image_recon_lib/spatial_filter.hpp>
+#include <simple_image_recon_lib/state.hpp>
 #include <vector>
-
-#include "simple_image_recon_lib/spatial_filter.hpp"
-#include "simple_image_recon_lib/state.hpp"
 
 namespace simple_image_recon_lib
 {
@@ -57,25 +62,33 @@ public:
     // update state
     s.setPbar(s.getPbar() * c_[0] + p * c_[1]);
     s.setL(L);
+#ifndef MINIMAL_STATE
     // run activity detector
-    if (!s.isActive()) {
-      numOccupiedPixels_++;
-      // state of top left corner of tile has actual pixel-in-tile count
-      auto & tile = state_[getTileIdx(ex, ey)];
-      if (tile.getNumPixActive() == 0) {
-        numOccupiedTiles_++;  // first active pixel in this tile
+    if (events_.size() < maxWindowSize_) {
+      if (!s.isActive()) {
+        numOccupiedPixels_++;
+        // state of top left corner of tile has actual pixel-in-tile count
+        auto & tile = state_[getTileIdx(ex, ey)];
+        if (tile.getNumPixActive() == 0) {
+          numOccupiedTiles_++;  // first active pixel in this tile
+        }
+        tile.incNumPixActive();  // bump number of pixels in this tile
       }
-      tile.incNumPixActive();  // bump number of pixels in this tile
+      s.incNumEventsInQueue();
+      events_.push(Event(t, ex, ey, static_cast<int8_t>(polarity)));
     }
-    s.incNumEventsInQueue();
-    events_.push(Event(t, ex, ey, static_cast<int8_t>(polarity)));
     processEventQueue();  // adjusts size of event window
+#endif
     currentTime_ = t;
   }
 
+#define Q_PROCESSING
+#define DO_SPATIAL_FILTERING
+#ifndef MINIMAL_STATE
   void processEventQueue()
   {
     while (events_.size() > eventWindowSize_) {
+#ifdef Q_PROCESSING
       const Event & e = events_.front();
       auto & s = state_[e.y() * width_ + e.x()];
       if (!s.isActive()) {
@@ -84,8 +97,9 @@ public:
       }
       s.decNumEventsInQueue();
       if (!s.isActive()) {
-        // s =  spatial_filter::filter<State, 3>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+#ifdef DO_SPATIAL_FILTERING
         s = spatial_filter::filter_3x3(state_.data(), e.x(), e.y(), width_, height_, GAUSSIAN_3x3);
+#endif
         //s =
         //spatial_filter::filter<State, 5>(&state_[0], e.x(), e.y(), width_, height_, GAUSSIAN_5x5);
         auto & tile = state_[getTileIdx(e.x(), e.y())];  // state of top left corner of tile
@@ -101,14 +115,24 @@ public:
         }
         numOccupiedPixels_--;
       }
+#endif
       events_.pop();  // remove element now
     }
     // adjust event window size up or down to match the fill ratio:
     // new_size = old_size * current_fill_ratio / desired_fill_ratio
     // The idea is that as the event window increases, the features will "fill out"
-    eventWindowSize_ = (eventWindowSize_ * numOccupiedTiles_ * fillRatioDenom_) /
-                       (numOccupiedPixels_ * fillRatioNum_);
+    eventWindowSize_ = std::min(
+      static_cast<uint64_t>(maxWindowSize_ * 0.9),
+      (eventWindowSize_ * numOccupiedTiles_ * fillRatioDenom_) /
+        (std::max(numOccupiedPixels_, 1UL) * fillRatioNum_));
+
+#if 0
+    std::cout << "target win sz: " << eventWindowSize_ << " #tiles: " << numOccupiedTiles_
+              << " #pix: " << numOccupiedPixels_ << " q sz: " << events_.size()
+              << " mxq sz: " << maxWindowSize_ << std::endl;
+#endif
   }
+#endif
 
   void initialize(
     size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio);
@@ -119,6 +143,7 @@ public:
   const std::vector<State> & getState() const { return (state_); }
 
   size_t getEventWindowSize() const { return (eventWindowSize_); }
+  size_t getQueueSize() const { return (events_.size()); }
 
   inline size_t getTileIdx(uint16_t ex, uint16_t ey) const
   {
@@ -160,7 +185,12 @@ private:
   uint64_t fillRatioNum_{1};                     // numerator of fill ratio
   uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
-  std::queue<Event> events_;                     // queue with buffered events
+  uint64_t maxWindowSize_{0};                    // maximum size of event window
+#ifdef USE_CIRCULAR_BUFFER
+  CircularBuffer<Event> events_;  // queue with buffered events
+#else
+  std::queue<Event> events_;  // queue with buffered events
+#endif
   // -------- debugging
   uint32_t currentTime_{0};
   static constexpr uint8_t ACTIVITY_ON_BIT = 6;
