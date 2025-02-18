@@ -21,6 +21,8 @@
 #include <cstdint>
 
 // #define MINIMAL_STATE
+#define COUNT_EVENTS
+#define SUPPORT_SCALE
 
 namespace simple_image_recon_lib
 {
@@ -35,6 +37,10 @@ public:
     ,
     numPixActive(npa),
     numEventsInQueue(neiq)
+#endif
+#ifdef SUPPORT_SCALE
+    ,
+    scale(1.0)
 #endif
   {
   }
@@ -51,6 +57,9 @@ public:
   inline void setL(state_t f) { L = f; }
   inline void setPbar(state_t f) { pbar = f; }
 
+#ifdef COUNT_EVENTS
+  const uint64_t * getNumEvents() const { return (num_events_); }
+#endif
   // ----------- related to activity -----------------------
 #ifndef MINIMAL_STATE
   uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
@@ -69,6 +78,12 @@ public:
 #ifndef MINIMAL_STATE
   uint8_t numPixActive{0};
   uint16_t numEventsInQueue{0};
+#endif
+#ifdef COUNT_EVENTS
+  uint64_t num_events_[2]{0, 0};
+#endif
+#ifdef SUPPORT_SCALE
+  float scale{1.0};
 #endif
   static constexpr int max_num_active() { return (255); };  // 8 bit
 

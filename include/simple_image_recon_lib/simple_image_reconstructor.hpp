@@ -54,9 +54,17 @@ public:
   void event(uint32_t t, uint16_t ex, uint16_t ey, uint8_t polarity)
   {
     auto & s = state_[ey * width_ + ex];
+#ifdef COUNT_EVENTS
+    s.num_events_[polarity]++;
+#endif
     const auto p = static_cast<state_t>((polarity == 0) ? -1 : 1);
+#ifdef SUPPORT_SCALE
+    // scale raw change in polarity (0 or +-2) by some pixel-dependent factor
+    const auto dp = s.scale * static_cast<float>(p - s.getPbar());
+#else
     // raw change in polarity, will be 0 or +-2
     const auto dp = static_cast<float>(p - s.getPbar());
+#endif
     // run the temporal filter
     const auto L = c_[2] * s.getL() + c_[3] * dp;
     // update state
@@ -137,6 +145,9 @@ public:
   void initialize(
     size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio);
   void getImage(uint8_t * img, size_t stride) const;
+#ifdef COUNT_EVENTS
+  void getEventCount(uint64_t * img, size_t stride) const;
+#endif
   size_t getWidth() const { return (width_); }
   size_t getHeight() const { return (height_); }
 
@@ -149,6 +160,7 @@ public:
   {
     return ((ey / tileSize_) * tileStrideY_ + (ex / tileSize_) * tileSize_);
   }
+  void readScaleFile(const std::string & f);
 
 private:
   class Event

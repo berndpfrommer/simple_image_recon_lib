@@ -22,6 +22,9 @@
 #include <queue>
 #include <vector>
 
+#define COUNT_EVENTS
+#define SUPPORT_SCALE
+
 namespace simple_image_recon_lib
 {
 namespace spatial_filter
@@ -50,6 +53,10 @@ static T filter(
       sum += state[iy * width + ix] * K[ky][kx];
     }
   }
+#ifdef COUNT_EVENTS
+  sum.num_events_[0] = cs.num_events_[0];
+  sum.num_events_[1] = cs.num_events_[1];
+#endif
   return (sum);
 }
 
@@ -130,6 +137,13 @@ static T filter_3x3(
       sum += s[idx(x + 1, y + 1, w)] * K[2][2];
     }
   }
+#ifdef COUNT_EVENTS
+  sum.num_events_[0] = center.num_events_[0];
+  sum.num_events_[1] = center.num_events_[1];
+#endif
+#ifdef SUPPORT_SCALE
+  sum.scale = center.scale;
+#endif
   return (sum);
 }
 }  // namespace spatial_filter

@@ -61,6 +61,9 @@ void SimpleImageReconstructor::initialize(
 #endif
   std::cout << "state size: " << sizeof(State) << " " << width * height * sizeof(State) << " bytes "
             << " max win: " << maxWindowSize_ << std::endl;
+#ifdef SUPPORT_SCALE
+  // readScaleFile("scale.txt");
+#endif
 }
 
 void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
@@ -89,6 +92,22 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
   }
 }
 
+void SimpleImageReconstructor::getEventCount(uint64_t * img, size_t stride) const
+{
+  size_t cnt_zero{0};
+  for (size_t iy = 0; iy < height_; iy++) {
+    const size_t y_off = iy * stride;
+    const size_t y_off_state = iy * width_;
+    for (size_t ix = 0; ix < width_; ix++) {
+      const auto & s = state_[y_off_state + ix];
+      img[y_off + 2 * ix] = s.getNumEvents()[0];
+      img[y_off + 2 * ix + 1] = s.getNumEvents()[1];
+      cnt_zero += (s.getNumEvents()[0] == 0 && s.getNumEvents()[1] == 0) ? 1 : 0;
+    }
+  }
+  std::cout << "sir: zero count is: " << cnt_zero << " out of " << height_ * width_ << std::endl;
+}
+
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
 {
   fillRatioDenom_ = 100;
@@ -100,6 +119,29 @@ void SimpleImageReconstructor::setFillRatio(double fill_ratio)
     const double nt_np = tiles_per_pixel / r;
     fillRatioNum_ = static_cast<uint64_t>(nt_np * static_cast<double>(fillRatioDenom_));
   }
+}
+
+static float clamp_n(int n) {
+  return static_cast<float>(std::min(std::max(n, 200), 3000));
+}
+
+void SimpleImageReconstructor::readScaleFile(const std::string &f){
+  std::ifstream input_file;
+  input_file.open(f);
+  if (!input_file.is_open()) {
+    throw std::runtime_error("cannot open scale file!");
+  }
+#ifdef SUPPORT_SCALE
+  float s;
+
+  for (size_t idx = 0; (input_file >> s) && (idx < width_ * height_); idx ++) {
+     state_[idx].scale = s;
+   }
+  std::cout << "read scale file: " << f << std::endl;
+  
+#else
+  throw std::runtime_error("scaling not supported!");
+#endif  
 }
 
 }  // namespace simple_image_recon_lib
