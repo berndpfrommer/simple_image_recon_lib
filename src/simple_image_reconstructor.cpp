@@ -16,11 +16,29 @@
 #include "simple_image_recon_lib/simple_image_reconstructor.hpp"
 
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <limits>
 
 namespace simple_image_recon_lib
 {
+static std::ofstream debug_file_0("debug_0.txt");
+static std::ofstream debug_file_1("debug_1.txt");
+static std::ofstream debug_pix_file("debug_pix.txt");
+
+void SimpleImageReconstructor::write_debug_data(uint8_t p, uint64_t count, float thr)
+{
+  auto & f = (p == 0) ? debug_file_0 : debug_file_1;
+  f << count << " " << thr << std::endl;
+}
+
+void SimpleImageReconstructor::write_debug_data_2(
+  uint64_t t, uint8_t p, float L1, float t1off, float t1on, float L2, float t2off, float t2on)
+{
+  debug_pix_file << t << " " << (int)p << " " << L1 << " " << t1off << " " << t1on << " " << L2
+                 << " " << t2off << " " << t2on << std::endl;
+}
+
 static void compute_alpha_beta(const double T_cut, double * alpha, double * beta)
 {
   // compute the filter coefficients alpha and beta (see frequency cam paper)
@@ -31,7 +49,8 @@ static void compute_alpha_beta(const double T_cut, double * alpha, double * beta
 }
 
 void SimpleImageReconstructor::initialize(
-  size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio)
+  size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio,
+  uint16_t thresh_width, uint16_t thresh_height, float thresh_mix_coeff)
 {
   width_ = width;
   height_ = height;
@@ -64,10 +83,12 @@ void SimpleImageReconstructor::initialize(
 #ifdef SUPPORT_SCALE
   // readScaleFile("scale.txt");
 #endif
+  threshold_estimator_.initialize(width, height, thresh_width, thresh_height, thresh_mix_coeff);
 }
 
 void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
 {
+#ifdef USE_MIN_MAX
   // find min and max for normalization
   float minL = std::numeric_limits<float>::max();
   float maxL = std::numeric_limits<float>::min();
@@ -80,14 +101,61 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
     }
   }
   // copy image over
-
   const float scale = 255.0F / (maxL - minL);
+#else
+  float sum(0);
+  float sum2(0);
+  float minL = std::numeric_limits<float>::max();
+  float maxL = std::numeric_limits<float>::min();
+  for (size_t i = 0; i < height_ * width_; i++) {
+    sum += state_[i].getL();
+    sum2 += state_[i].getL() * state_[i].getL();
+    if (state_[i].getL() > maxL) {
+      maxL = state_[i].getL();
+    }
+    if (state_[i].getL() < minL) {
+      minL = state_[i].getL();
+    }
+  }
+  const float npix = height_ * width_;
+  const float mean = sum / npix;
+  const float stddev = std::max(0.1f, std::sqrt(std::max(0.0f, sum2 / npix - mean * mean)));
+  const float scale = 128.0F / (2 * stddev);
+  const float offset = mean - 128.0 / scale;
+  std::cout << "min: " << minL << " max: " << maxL << " stddev: " << stddev << " mean: " << mean
+            << std::endl;
+#endif
   for (size_t iy = 0; iy < height_; iy++) {
     const size_t y_off = iy * stride;
     const size_t y_off_state = iy * width_;
     for (size_t ix = 0; ix < width_; ix++) {
       const auto & s = state_[y_off_state + ix];
-      img[y_off + ix] = static_cast<uint8_t>((s.getL() - minL) * scale);
+#ifdef USE_MIN_MAX
+      if (s.getL() == maxL) {
+        std::cout << "max pixel: (" << ix << "," << iy << "): " << s.getL() << std::endl;
+      }
+      if (s.getL() == minL) {
+        std::cout << "min pixel: (" << ix << "," << iy << "): " << s.getL() << std::endl;
+      }
+      const uint8_t v = static_cast<uint8_t>((s.getL() - minL) * scale);
+#else
+      const uint8_t v =
+        static_cast<uint8_t>(std::clamp<float>((s.getL() - offset) * scale, 0, 255.0));
+#endif
+      img[y_off + ix] = v;
+    }
+  }
+}
+
+void SimpleImageReconstructor::getThresholds(float * img, size_t stride) const
+{
+  for (size_t iy = 0; iy < height_; iy++) {
+    const size_t y_off = iy * stride;
+    const size_t y_off_state = iy * width_;
+    for (size_t ix = 0; ix < width_; ix++) {
+      const auto & s = state_[y_off_state + ix];
+      img[y_off + 2 * ix] = s.getThreshold(0);
+      img[y_off + 2 * ix + 1] = s.getThreshold(1);
     }
   }
 }
@@ -121,11 +189,10 @@ void SimpleImageReconstructor::setFillRatio(double fill_ratio)
   }
 }
 
-static float clamp_n(int n) {
-  return static_cast<float>(std::min(std::max(n, 200), 3000));
-}
+static float clamp_n(int n) { return static_cast<float>(std::min(std::max(n, 200), 3000)); }
 
-void SimpleImageReconstructor::readScaleFile(const std::string &f){
+void SimpleImageReconstructor::readScaleFile(const std::string & f)
+{
   std::ifstream input_file;
   input_file.open(f);
   if (!input_file.is_open()) {
@@ -134,14 +201,14 @@ void SimpleImageReconstructor::readScaleFile(const std::string &f){
 #ifdef SUPPORT_SCALE
   float s;
 
-  for (size_t idx = 0; (input_file >> s) && (idx < width_ * height_); idx ++) {
-     state_[idx].scale = s;
-   }
+  for (size_t idx = 0; (input_file >> s) && (idx < width_ * height_); idx++) {
+    state_[idx].scale = s;
+  }
   std::cout << "read scale file: " << f << std::endl;
-  
+
 #else
   throw std::runtime_error("scaling not supported!");
-#endif  
+#endif
 }
 
 }  // namespace simple_image_recon_lib

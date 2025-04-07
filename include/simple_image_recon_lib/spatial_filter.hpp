@@ -70,7 +70,8 @@ static T filter_3x3(
   const auto cc = K[1][1];
   const auto & center = s[idx(x, y, w)];
   T sum(
-    center.getL() * cc, center.getPbar(), center.getNumPixActive(), center.getNumEventsInQueue());
+    center.getL() * cc, center.getPbar(), center.getNumPixActive(), center.getNumEventsInQueue(),
+    center.scale, center.last_count, center.threshold);
 
   if (x > 0) {            // not at the left boundary
     if (x < w - 1) {      // not at the right boundary

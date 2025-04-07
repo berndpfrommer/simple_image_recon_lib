@@ -30,6 +30,7 @@
 #endif
 #include <simple_image_recon_lib/spatial_filter.hpp>
 #include <simple_image_recon_lib/state.hpp>
+#include <simple_image_recon_lib/threshold_estimator.hpp>
 #include <vector>
 
 namespace simple_image_recon_lib
@@ -51,13 +52,30 @@ public:
 
   SimpleImageReconstructor() = default;
 
-  void event(uint32_t t, uint16_t ex, uint16_t ey, uint8_t polarity)
+  void event(uint64_t t, uint16_t ex, uint16_t ey, uint8_t polarity)
   {
     auto & s = state_[ey * width_ + ex];
+    uint64_t count = threshold_estimator_.updateThreshold(&s, polarity, ex, ey);
+#if 1
+    if (ex == 341 && ey == 239) {
+      write_debug_data(polarity, count, s.getThreshold(polarity));
+      const auto & s1 = state_[ey * width_ + ex];
+      const auto & s2 = state_[ey * width_ + ex + 1];
+      write_debug_data_2(
+        t, polarity, s1.getL(), s1.getThreshold(0), s1.getThreshold(1), s2.getL(),
+        s2.getThreshold(0), s2.getThreshold(1));
+    }
+#endif
+
 #ifdef COUNT_EVENTS
     s.num_events_[polarity]++;
 #endif
+#define USE_THRESHOLDS
+#ifdef USE_THRESHOLDS
+    const auto p = (polarity == 0) ? -s.threshold[polarity] : s.threshold[polarity];
+#else
     const auto p = static_cast<state_t>((polarity == 0) ? -1 : 1);
+#endif
 #ifdef SUPPORT_SCALE
     // scale raw change in polarity (0 or +-2) by some pixel-dependent factor
     const auto dp = s.scale * static_cast<float>(p - s.getPbar());
@@ -143,8 +161,11 @@ public:
 #endif
 
   void initialize(
-    size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio);
+    size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio,
+    uint16_t thresh_width = 80, uint16_t thresh_height = 80, float thresh_mix_coeff = 0.01);
+
   void getImage(uint8_t * img, size_t stride) const;
+  void getThresholds(float * img, size_t stride) const;
 #ifdef COUNT_EVENTS
   void getEventCount(uint64_t * img, size_t stride) const;
 #endif
@@ -182,6 +203,9 @@ private:
   };
 
   void setFillRatio(double fill_ratio);
+  static void write_debug_data(uint8_t p, uint64_t count, float thr);
+  static void write_debug_data_2(
+    uint64_t t, uint8_t p, float L1, float t1off, float t1on, float L2, float t2off, float t2on);
 
   // ------------------- variables ------------------
   size_t width_{0};
@@ -203,6 +227,7 @@ private:
 #else
   std::queue<Event> events_;  // queue with buffered events
 #endif
+  ThresholdEstimator threshold_estimator_;
   // -------- debugging
   uint32_t currentTime_{0};
   static constexpr uint8_t ACTIVITY_ON_BIT = 6;
