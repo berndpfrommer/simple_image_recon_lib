@@ -16,6 +16,7 @@
 #include "simple_image_recon_lib/simple_image_reconstructor.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <limits>
 
@@ -79,6 +80,16 @@ void SimpleImageReconstructor::getImage(uint8_t * img, size_t stride) const
       const auto & s = state_[y_off_state + ix];
       img[y_off + ix] = static_cast<uint8_t>((s.getL() - minL) * scale);
     }
+  }
+}
+
+void SimpleImageReconstructor::getActivePixelImage(uint8_t * img, size_t stride) const
+{
+  // clear image
+  memset(img, 0, height_ * stride);
+
+  for (const auto & qe : events_) {
+    img[qe.y() * stride + qe.x()]++;
   }
 }
 

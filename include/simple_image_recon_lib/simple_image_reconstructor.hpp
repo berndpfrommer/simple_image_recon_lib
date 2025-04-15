@@ -19,9 +19,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <iostream>
-#include <queue>
 #include <vector>
 
 #include "simple_image_recon_lib/spatial_filter.hpp"
@@ -68,7 +68,7 @@ public:
       tile.incNumPixActive();  // bump number of pixels in this tile
     }
     s.incNumEventsInQueue();
-    events_.push(Event(t, ex, ey, static_cast<int8_t>(polarity)));
+    events_.push_back(Event(t, ex, ey, static_cast<int8_t>(polarity)));
     processEventQueue();  // adjusts size of event window
     currentTime_ = t;
   }
@@ -101,7 +101,7 @@ public:
         }
         numOccupiedPixels_--;
       }
-      events_.pop();  // remove element now
+      events_.pop_front();  // remove element now
     }
     // adjust event window size up or down to match the fill ratio:
     // new_size = old_size * current_fill_ratio / desired_fill_ratio
@@ -113,8 +113,14 @@ public:
   void initialize(
     size_t width, size_t height, uint32_t cutoffTime, uint32_t tileSize, double fillRatio);
   void getImage(uint8_t * img, size_t stride) const;
+  void getActivePixelImage(uint8_t * img, size_t stride) const;
   size_t getWidth() const { return (width_); }
   size_t getHeight() const { return (height_); }
+  size_t getCurrentQueueSize() const { return (events_.size()); }
+  double getCurrentFillRatio() const
+  {
+    return (static_cast<double>(numOccupiedPixels_) / (numOccupiedTiles_ * tileSize_ * tileSize_));
+  }
 
   const std::vector<State> & getState() const { return (state_); }
 
@@ -160,7 +166,7 @@ private:
   uint64_t fillRatioNum_{1};                     // numerator of fill ratio
   uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
-  std::queue<Event> events_;                     // queue with buffered events
+  std::deque<Event> events_;                     // queue with buffered events
   // -------- debugging
   uint32_t currentTime_{0};
   static constexpr uint8_t ACTIVITY_ON_BIT = 6;
