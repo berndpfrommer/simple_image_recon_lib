@@ -54,6 +54,8 @@ void SimpleImageReconstructor::initialize(
               << static_cast<int>(std::sqrt(maxArea)) << std::endl;
     throw(std::runtime_error("activity tile size too big"));
   }
+  // disable any queue usage if tile size is set to zero
+  maxWindowSize_ = tileSize_ > 0 ? static_cast<uint64_t>(width_ * height_ * 0.9) : 0;
   setFillRatio(fillRatio);
 }
 
@@ -91,17 +93,25 @@ void SimpleImageReconstructor::getActivePixelImage(uint8_t * img, size_t stride)
   for (const auto & qe : events_) {
     img[qe.y() * stride + qe.x()]++;
   }
+
+  const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
+                              (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
+
+  std::cout << targetSize << " " << eventWindowSize_ << " " << numOccupiedTiles_ << " "
+            << fillRatioDenom_ << " " << numOccupiedPixels_ << " " << fillRatioNum_ << std::endl;
 }
 
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
 {
   fillRatioDenom_ = 100;
+  const double A = static_cast<double>(tileSize_ * tileSize_);  // area of tile
   // how many tiles per pixel when fully filled
-  const double tiles_per_pixel = 1.0 / (tileSize_ * tileSize_);
+  const double tiles_per_pixel = 1.0 / A;
   // a fill ratio below 1 pixel per tile is not achievable
   const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
-  const double nt_np = tiles_per_pixel / r;
-  fillRatioNum_ = static_cast<uint64_t>(nt_np * static_cast<double>(fillRatioDenom_));
+  const double nt_np = A * r;
+  fillRatioNum_ = static_cast<uint64_t>(nt_np * fillRatioDenom_);
+  minWindowSize_ = A > 0 ? std::ceil((1.0 / (nt_np - 1.0))) : 0;
 }
 
 }  // namespace simple_image_recon_lib

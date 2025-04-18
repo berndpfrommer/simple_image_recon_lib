@@ -106,8 +106,11 @@ public:
     // adjust event window size up or down to match the fill ratio:
     // new_size = old_size * current_fill_ratio / desired_fill_ratio
     // The idea is that as the event window increases, the features will "fill out"
-    eventWindowSize_ = (eventWindowSize_ * numOccupiedTiles_ * fillRatioDenom_) /
-                       (numOccupiedPixels_ * fillRatioNum_);
+    const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
+                                (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
+    // prevent the event window from collapsing to zero
+    // and from growing without bounds
+    eventWindowSize_ = std::max(minWindowSize_, std::min(maxWindowSize_, targetSize));
   }
 
   void initialize(
@@ -166,6 +169,8 @@ private:
   uint64_t fillRatioNum_{1};                     // numerator of fill ratio
   uint64_t numOccupiedPixels_{0};                // currently occupied number of pixels
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
+  uint64_t maxWindowSize_{0};                    // maximum size of event window
+  uint64_t minWindowSize_{0};                    // minimum size of event window
   std::deque<Event> events_;                     // queue with buffered events
   // -------- debugging
   uint32_t currentTime_{0};
