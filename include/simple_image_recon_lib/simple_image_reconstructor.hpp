@@ -122,7 +122,10 @@ public:
   size_t getCurrentQueueSize() const { return (events_.size()); }
   double getCurrentFillRatio() const
   {
-    return (static_cast<double>(numOccupiedPixels_) / (numOccupiedTiles_ * tileSize_ * tileSize_));
+    return (
+      numOccupiedTiles_ == 0
+        ? -1.0
+        : static_cast<double>(numOccupiedPixels_) / (numOccupiedTiles_ * tileSize_ * tileSize_));
   }
 
   const std::vector<State> & getState() const { return (state_); }
