@@ -108,8 +108,7 @@ public:
     // The idea is that as the event window increases, the features will "fill out"
     const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
                                 (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
-    // prevent the event window from collapsing to zero
-    // and from growing without bounds
+    // prevent the event window from collapsing to zero and from growing without bounds
     eventWindowSize_ = std::max(minWindowSize_, std::min(maxWindowSize_, targetSize));
   }
 

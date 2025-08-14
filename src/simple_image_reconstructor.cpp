@@ -104,14 +104,25 @@ void SimpleImageReconstructor::getActivePixelImage(uint8_t * img, size_t stride)
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
 {
   fillRatioDenom_ = 100;
-  const double A = static_cast<double>(tileSize_ * tileSize_);  // area of tile
+  // A is the area of the tile (in pixels)
+  const double A = static_cast<double>(tileSize_ * tileSize_);
   // how many tiles per pixel when fully filled
   const double tiles_per_pixel = 1.0 / A;
   // a fill ratio below 1 pixel per tile is not achievable
   const double r = std::min(1.0, std::max(fill_ratio, tiles_per_pixel + 1e-3));
-  const double nt_np = A * r;
-  fillRatioNum_ = static_cast<uint64_t>(nt_np * fillRatioDenom_);
-  minWindowSize_ = A > 0 ? std::ceil((1.0 / (nt_np - 1.0))) : 0;
+  const double np_nt = A * r;  // targeted number of pixels per tile
+  fillRatioNum_ = static_cast<uint64_t>(np_nt * fillRatioDenom_);
+  // The update equation for the queue length q is
+  // q_{k+1} = floor(q_k * f)
+  // where f is the current gain:
+  // f = (num_tiles * 100 * np_nt) / (num_pixels * 100)
+  // For the queue to be able to grow, we must ensure that
+  // q_k * f > q_k + 1
+  // meaning q_k > 1/(f - 1)
+  // The largest that f can become is when num_tiles == num_pixels,
+  // in which case f = np_t, and so q_k > 1 / (np_nt - 1)
+  //
+  minWindowSize_ = A > 0 ? std::ceil((1.0 / (np_nt - 1.0))) : 0;
 }
 
 }  // namespace simple_image_recon_lib
