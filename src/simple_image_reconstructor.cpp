@@ -96,9 +96,10 @@ void SimpleImageReconstructor::getActivePixelImage(uint8_t * img, size_t stride)
 
   const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
                               (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
-
+#if 0
   std::cout << targetSize << " " << eventWindowSize_ << " " << numOccupiedTiles_ << " "
             << fillRatioDenom_ << " " << numOccupiedPixels_ << " " << fillRatioNum_ << std::endl;
+#endif
 }
 
 void SimpleImageReconstructor::setFillRatio(double fill_ratio)
