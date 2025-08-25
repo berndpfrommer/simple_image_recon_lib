@@ -44,8 +44,8 @@ public:
   inline void setPbar(state_t f) { pbar = f; }
 
   // ----------- related to activity -----------------------
-  uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
-  uint8_t getNumPixActive() const { return (numPixActive); }
+  inline uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
+  inline uint8_t getNumPixActive() const { return (numPixActive); }
 
   inline bool isActive() const { return (numEventsInQueue != 0); }
   inline void incNumPixActive() { numPixActive++; }

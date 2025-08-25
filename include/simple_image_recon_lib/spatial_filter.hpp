@@ -55,29 +55,32 @@ static T filter(
 
 template <typename T>
 static T filter_3x3(
-  const T * s, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+  const T * s, const uint16_t x, const uint16_t y, const uint16_t w, const uint16_t h,
   const std::array<std::array<float, 3>, 3> & K)
 {
   // first initialize the filter sum with the center, from where
-  // it also gets its pixel count (but not the activity!)
-  const auto cc = K[1][1];
-  const auto & center = s[idx(x, y, w)];
+  // it also gets its pixel count
+  const size_t idx_0 = y * w + x;
+  const auto & center = s[idx_0];
   T sum(
-    center.getL() * cc, center.getPbar(), center.getNumPixActive(), center.getNumEventsInQueue());
+    center.getL() * K[1][1], center.getPbar(), center.getNumPixActive(),
+    center.getNumEventsInQueue());
 
   if (x > 0) {            // not at the left boundary
     if (x < w - 1) {      // not at the right boundary
       if (y > 0) {        // not at the top boundary
         if (y < h - 1) {  // at none of the boundaries
-          // update entire region
-          sum += s[idx(x - 1, y - 1, w)] * K[0][0];
-          sum += s[idx(x, y - 1, w)] * K[1][0];
-          sum += s[idx(x + 1, y - 1, w)] * K[2][0];
-          sum += s[idx(x - 1, y, w)] * K[0][1];
-          sum += s[idx(x + 1, y, w)] * K[2][1];
-          sum += s[idx(x - 1, y + 1, w)] * K[0][2];
-          sum += s[idx(x, y + 1, w)] * K[1][2];
-          sum += s[idx(x + 1, y + 1, w)] * K[2][2];
+          // more optimized implementation here
+          const size_t idx_rm1 = idx_0 - w;
+          const size_t idx_rp1 = idx_0 + w;
+          sum += s[idx_rm1 - 1] * K[0][0];
+          sum += s[idx_rm1] * K[1][0];
+          sum += s[idx_rm1 + 1] * K[2][0];
+          sum += s[idx_0 - 1] * K[0][1];
+          sum += s[idx_0 + 1] * K[2][1];
+          sum += s[idx_rp1 - 1] * K[0][2];
+          sum += s[idx_rp1] * K[1][2];
+          sum += s[idx_rp1 + 1] * K[2][2];
         } else {  // at bottom boundary, but not corner
           sum += s[idx(x - 1, y - 1, w)] * K[0][0];
           sum += s[idx(x, y - 1, w)] * K[1][0];

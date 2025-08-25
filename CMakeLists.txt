@@ -23,11 +23,11 @@ include (GNUInstallDirs)
 
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
-add_library(${PROJECT_NAME} SHARED src/simple_image_reconstructor.cpp)
+add_library(${PROJECT_NAME} INTERFACE)
 set_target_properties(${PROJECT_NAME} PROPERTIES  CXX_STANDARD 14)
 target_include_directories(
     ${PROJECT_NAME}
-  PUBLIC
+  INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
