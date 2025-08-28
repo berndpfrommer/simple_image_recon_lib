@@ -21,6 +21,8 @@
 #include <iostream>
 #include <queue>
 #include <vector>
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
 namespace simple_image_recon_lib
 {
@@ -66,10 +68,10 @@ static T filter_3x3(
     center.getL() * K[1][1], center.getPbar(), center.getNumPixActive(),
     center.getNumEventsInQueue());
 
-  if (x > 0) {            // not at the left boundary
-    if (x < w - 1) {      // not at the right boundary
-      if (y > 0) {        // not at the top boundary
-        if (y < h - 1) {  // at none of the boundaries
+  if (LIKELY(x > 0)) {            // not at the left boundary
+    if (LIKELY(x < w - 1)) {      // not at the right boundary
+      if (LIKELY(y > 0)) {        // not at the top boundary
+        if (LIKELY(y < h - 1)) {  // at none of the boundaries
           // more optimized implementation here
           const size_t idx_rm1 = idx_0 - w;
           const size_t idx_rp1 = idx_0 + w;
@@ -95,9 +97,9 @@ static T filter_3x3(
         sum += s[idx(x, y + 1, w)] * K[1][2];
         sum += s[idx(x + 1, y + 1, w)] * K[2][2];
       }
-    } else {              // somewhere at the right boundary
-      if (y > 0) {        // not at the top boundary
-        if (y < h - 1) {  // at the right boundary, but not corner
+    } else {                      // somewhere at the right boundary
+      if (LIKELY(y > 0)) {        // not at the top boundary
+        if (LIKELY(y < h - 1)) {  // at the right boundary, but not corner
           sum += s[idx(x - 1, y - 1, w)] * K[0][0];
           sum += s[idx(x, y - 1, w)] * K[1][0];
           sum += s[idx(x - 1, y, w)] * K[0][1];
@@ -114,9 +116,9 @@ static T filter_3x3(
         sum += s[idx(x, y + 1, w)] * K[1][2];
       }
     }
-  } else {              // somewhere at the left boundary
-    if (y > 0) {        // not at the top left corner
-      if (y < h - 1) {  // at the left boundary, but not at corner
+  } else {                      // somewhere at the left boundary
+    if (LIKELY(y > 0)) {        // not at the top left corner
+      if (LIKELY(y < h - 1)) {  // at the left boundary, but not at corner
         sum += s[idx(x, y - 1, w)] * K[1][0];
         sum += s[idx(x + 1, y - 1, w)] * K[2][0];
         sum += s[idx(x + 1, y, w)] * K[2][1];
