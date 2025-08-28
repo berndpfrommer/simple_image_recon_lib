@@ -78,6 +78,8 @@ public:
     s.setPbar(s.getPbar() * c_[0] + p * c_[1]);
     s.setL(L);
     // run activity detector
+#define USE_SPATIAL_FILTER
+#ifdef USE_SPATIAL_FILTER
     if (!s.isActive()) {
       numOccupiedPixels_++;
       // state of top left corner of tile has actual pixel-in-tile count
@@ -88,8 +90,9 @@ public:
       tile.incNumPixActive();  // bump number of pixels in this tile
     }
     s.incNumEventsInQueue();
-    events_.push_back(Event(t, ex, ey, static_cast<int8_t>(polarity)));
+    events_.push_back(Event(ex, ey, static_cast<int8_t>(polarity)));
     processEventQueue();  // adjusts size of event window
+#endif
     currentTime_ = t;
   }
 
@@ -264,19 +267,14 @@ private:
   class Event
   {
   public:
-    explicit Event(uint32_t t_a, uint16_t x, uint16_t y, int8_t p) : time(t_a), ex(x), ey(y), ep(p)
-    {
-    }
-    inline uint32_t t() const { return (time); }
+    explicit Event(uint16_t x, uint16_t y, int8_t p) : ex(x), ey(y | (p << 15)) {}
     inline uint16_t x() const { return (ex); }
-    inline uint16_t y() const { return (ey); }
-    inline int8_t p() const { return (ep); }
+    inline uint16_t y() const { return (ey & 0x7fff); }
+    inline int8_t p() const { return ((ey & 0x8000) >> 15); }
 
   private:
-    uint32_t time;
     uint16_t ex;
     uint16_t ey;
-    int8_t ep;
   };
   void computeAlphaBeta(const double T_cut, double * alpha, double * beta)
   {
