@@ -36,6 +36,41 @@
 
 namespace simple_image_recon_lib
 {
+
+template <class T>
+class MyQueue
+{
+public:
+  void reserve(size_t sz) { buffer_.resize(sz); }
+  void push_back(const T & x)
+  {
+    buffer_[idx_back_] = x;
+    idx_back_++;
+    size_++;
+    if (idx_back_ == buffer_.size()) {
+      idx_back_ = 0;
+    }
+  }
+
+  void pop_front()
+  {
+    idx_front_++;
+    if (idx_front_ == buffer_.size()) {
+      idx_front_ = 0;
+    }
+    size_--;
+  }
+  const T & front() const { return (buffer_[idx_front_]); }
+
+  size_t size() const { return (size_); }
+
+private:
+  size_t idx_front_{0};
+  size_t idx_back_{0};
+  size_t size_{0};
+  std::vector<T> buffer_;
+};
+
 template <int tile_size>
 inline size_t getTileIndex(uint16_t ex, uint16_t ey, uint16_t tileStrideY)
 {
@@ -201,6 +236,7 @@ public:
     // disable any queue usage if tile size is set to zero
     maxWindowSize_ = tile_size > 0 ? static_cast<uint64_t>(width_ * height_) : 0;
     setFillRatio(fillRatio);
+    events_.reserve(maxWindowSize_ * 0.2);
   }
 
   void getImage(uint8_t * img, size_t stride) const
@@ -233,9 +269,11 @@ public:
   {
     // clear image
     memset(img, 0, height_ * stride);
+#if 0
     for (const auto & qe : events_) {
       img[qe.y() * stride + qe.x()]++;
     }
+#endif
   }
 
   void setFillRatio(double fill_ratio)
@@ -299,7 +337,7 @@ private:
   uint64_t numOccupiedTiles_{0};                 // currently occupied number of blocks
   uint64_t maxWindowSize_{0};                    // maximum size of event window
   uint64_t minWindowSize_{0};                    // minimum size of event window
-  std::deque<Event> events_;                     // queue with buffered events
+  MyQueue<Event> events_;                        // queue with buffered events
   // -------- debugging
   uint32_t currentTime_{0};
   uint32_t num_filtered_{0};
