@@ -30,6 +30,8 @@
 #include "simple_image_recon_lib/spatial_filter.hpp"
 #include "simple_image_recon_lib/state.hpp"
 
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #define SANITY_CHECKS
 
 namespace simple_image_recon_lib
@@ -39,14 +41,12 @@ inline size_t getTileIndex(uint16_t ex, uint16_t ey, uint16_t tileStrideY)
 {
   return ((ey / tile_size) * tileStrideY + (ex / tile_size) * tile_size);
 }
-#if 1
 template <>
 inline size_t getTileIndex<2>(uint16_t ex, uint16_t ey, uint16_t tileStrideY)
 
 {
   return ((ey >> 1) * tileStrideY + (ex & ~1));
 }
-#endif
 
 template <uint8_t tile_size = 2>
 class SimpleImageReconstructor
@@ -81,11 +81,11 @@ public:
 #define USE_SPATIAL_FILTER
 #ifdef USE_SPATIAL_FILTER
     if (!s.isActive()) {
-      numOccupiedPixels_++;
+      numOccupiedPixels_ += fillRatioDenom_;
       // state of top left corner of tile has actual pixel-in-tile count
       auto & tile = state_[getTileIdx(ex, ey)];
       if (tile.getNumPixActive() == 0) {
-        numOccupiedTiles_++;  // first active pixel in this tile
+        numOccupiedTiles_ += fillRatioNum_;  // first active pixel in this tile
       }
       tile.incNumPixActive();  // bump number of pixels in this tile
     }
@@ -128,9 +128,9 @@ public:
         // remove number of pixels in this tile
         tile.decNumPixActive();
         if (tile.getNumPixActive() == 0) {
-          numOccupiedTiles_--;
+          numOccupiedTiles_ -= fillRatioNum_;
         }
-        numOccupiedPixels_--;
+        numOccupiedPixels_ -= fillRatioDenom_;
         num_filtered_++;
       }
       events_.pop_front();  // remove element now
@@ -140,16 +140,19 @@ public:
     // The idea is that as the event window increases, the features will "fill out"
 #define AVOID_DIVISION
 #ifdef AVOID_DIVISION
-    const int64_t ntfn = numOccupiedTiles_ * fillRatioNum_;
-    const int64_t npfd = std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_;
-    if (std::abs(500 * (ntfn - npfd)) > npfd) {
+    const int64_t ntfn = numOccupiedTiles_;
+    int64_t npfd = numOccupiedPixels_;
+    if (UNLIKELY(npfd <= 1)) {
+      npfd = fillRatioDenom_;
+    }
+    if (LIKELY(std::abs(500 * (ntfn - npfd)) > npfd)) {
       const uint64_t targetSize = (eventWindowSize_ * ntfn) / npfd;
       // prevent the event window from collapsing to zero and from growing without bounds
       eventWindowSize_ = std::max(minWindowSize_, std::min(maxWindowSize_, targetSize));
     }
 #else
-    const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
-                                (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
+    const uint64_t targetSize =
+      (eventWindowSize_ * numOccupiedTiles_) / (std::max(numOccupiedPixels_, fillRatioDenom_));
     eventWindowSize_ = std::max(minWindowSize_, std::min(maxWindowSize_, targetSize));
 #endif
   }
@@ -196,7 +199,7 @@ public:
       throw(std::runtime_error("activity tile size too big"));
     }
     // disable any queue usage if tile size is set to zero
-    maxWindowSize_ = tile_size > 0 ? static_cast<uint64_t>(width_ * height_ * 0.9) : 0;
+    maxWindowSize_ = tile_size > 0 ? static_cast<uint64_t>(width_ * height_) : 0;
     setFillRatio(fillRatio);
   }
 
@@ -230,13 +233,9 @@ public:
   {
     // clear image
     memset(img, 0, height_ * stride);
-
     for (const auto & qe : events_) {
       img[qe.y() * stride + qe.x()]++;
     }
-
-    const uint64_t targetSize = (eventWindowSize_ * numOccupiedTiles_ * fillRatioNum_) /
-                                (std::max(numOccupiedPixels_, 1UL) * fillRatioDenom_);
   }
 
   void setFillRatio(double fill_ratio)
@@ -267,14 +266,14 @@ private:
   class Event
   {
   public:
-    explicit Event(uint16_t x, uint16_t y, int8_t p) : ex(x), ey(y | (p << 15)) {}
+    explicit Event(uint16_t x = 0, uint16_t y = 0, int8_t p = 0) : ex(x), ey(y | (p << 15)) {}
     inline uint16_t x() const { return (ex); }
     inline uint16_t y() const { return (ey & 0x7fff); }
     inline int8_t p() const { return ((ey & 0x8000) >> 15); }
 
   private:
-    uint16_t ex;
-    uint16_t ey;
+    uint16_t ex{0};
+    uint16_t ey{0};
   };
   void computeAlphaBeta(const double T_cut, double * alpha, double * beta)
   {
