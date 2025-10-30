@@ -42,6 +42,9 @@ public:
   inline state_t getPbar() const { return (pbar); }
   inline void setL(state_t f) { L = f; }
   inline void setPbar(state_t f) { pbar = f; }
+#ifdef RESCALE
+  inline state_t getScale() const { return (scale); }
+#endif
 
   // ----------- related to activity -----------------------
   inline uint16_t getNumEventsInQueue() const { return (numEventsInQueue); }
@@ -59,7 +62,9 @@ public:
   state_t pbar{0};
   uint8_t numPixActive{0};
   uint16_t numEventsInQueue{0};
-
+#ifdef RESCALE
+  state_t scale{1.0};
+#endif
   static constexpr int max_num_active() { return (255); };  // 8 bit
 
 private:

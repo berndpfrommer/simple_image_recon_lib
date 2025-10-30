@@ -70,8 +70,13 @@ public:
   {
     auto & s = state_[ey * width_ + ex];
     const auto p = static_cast<state_t>((polarity == 0) ? -1 : 1);
+#ifdef RESCALE
+    // change in polarity, will be scale * (0 or +-2)
+    const auto dp = s.getScale() * static_cast<float>(p - s.getPbar());
+#else
     // raw change in polarity, will be 0 or +-2
     const auto dp = static_cast<float>(p - s.getPbar());
+#endif
     // run the temporal filter
     const auto L = c_[2] * s.getL() + c_[3] * dp;
     // update state
@@ -261,6 +266,42 @@ public:
     //
     minWindowSize_ = A > 0 ? std::ceil((1.0 / (np_nt - 1.0))) : 0;
   }
+
+#ifdef RESCALE
+  void readScaleFile(const std::string & fname)
+  {
+    std::ifstream file;
+    file.open(fname);
+    if (!file.is_open()) {
+      throw std::runtime_error("cannot open scale file: " + fname);
+    }
+    const uint32_t n_pix = width_ * height_;
+    uint64_t sum{0};
+    uint32_t s;
+    for (size_t idx = 0; (file >> s) && (idx < n_pix * 2); idx++) {
+      sum += s;
+    }
+    const double ntot_avg = sum / n_pix;
+    file.close();
+    file.open(fname);
+    uint32_t n_on, n_off;
+    size_t idx = 0;
+    double ss{0}, ss2{0}, sum_inv{0};
+    for (; (file >> n_on) && (file >> n_off) && (idx < n_pix); idx++) {
+      const double C_i = ntot_avg / static_cast<double>(n_on + n_off);
+      state_[idx].scale = C_i;
+      ss += C_i;
+      ss2 += C_i * C_i;
+      sum_inv += 1.0 / C_i;
+    }
+    ss = ss / n_pix;
+    ss2 = ss2 / n_pix;
+    const double stddev = std::sqrt(ss2 - ss * ss);
+    std::cout << "read scale file: " << fname << " with " << idx << " entries and " << ntot_avg
+              << " events/pixel, avg C: " << ss << " stdev: " << stddev
+              << " harmonic mean: " << (n_pix / sum_inv) << std::endl;
+  }
+#endif
 
 private:
   class Event
